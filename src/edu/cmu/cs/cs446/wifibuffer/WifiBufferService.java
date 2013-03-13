@@ -18,13 +18,8 @@ import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
 /**
  * This is an example of implementing an application service that runs in a
  * different process than the application. Because it can be in another process,
- * we must use IPC to interact with it. The {@link Controller} and
- * {@link ClientActivity} classes show how to interact with the service.
- *
- * Note that most applications <strong>do not</strong> need to deal with the
- * complexity shown here. If your application simply has a service running in
- * its own process, the {@link LocalService} sample shows a much simpler way to
- * interact with it.
+ * we must use IPC to interact with it. The {@link ClientActivity} class shows
+ * how to interact with the service.
  */
 @SuppressLint("HandlerLeak")
 public class WifiBufferService extends Service {
@@ -64,7 +59,6 @@ public class WifiBufferService extends Service {
     }
   };
 
-  
   /**
    * A list of callbacks that have been registered with the service.
    */
@@ -103,7 +97,7 @@ public class WifiBufferService extends Service {
   }
 
   @Override
-  public IBinder onBind(Intent intent) {  
+  public IBinder onBind(Intent intent) {
     return mBinder;
   }
 
@@ -134,9 +128,10 @@ public class WifiBufferService extends Service {
   /**
    * Show a notification while this service is running.
    */
-  private void showNotification() {  
-    Bitmap largeIcon = BitmapFactory.decodeResource(getResources(), R.drawable.device_access_network_wifi);
-    
+  private void showNotification() {
+    Bitmap largeIcon = BitmapFactory.decodeResource(getResources(),
+        R.drawable.device_access_network_wifi);
+
     @SuppressWarnings("deprecation")
     Notification notification = new Notification.Builder(this)
         .setSmallIcon(R.drawable.device_access_network_wifi)
@@ -146,7 +141,8 @@ public class WifiBufferService extends Service {
         .setWhen(System.currentTimeMillis())
         .getNotification();
 
-    // Send the notification. We use a string id because it is a unique number. We use it later to cancel.
+    // Send the notification. We use a string id because it is a unique number.
+    // We use it later to cancel.
     mNM.notify(R.string.remote_service_started, notification);
   }
 }
