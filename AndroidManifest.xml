@@ -3,6 +3,11 @@
     android:versionCode="1"
     android:versionName="1.0" >
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <uses-feature android:name="android.hardware.wifi" />
+
     <uses-sdk
         android:minSdkVersion="14"
         android:targetSdkVersion="17" />
@@ -12,11 +17,13 @@
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
+        
         <service
             android:name="edu.cmu.cs.cs446.wifibuffer.WifiBufferService"
+            android:exported="true"
+            android:permission="android.permission.INTERNET"
             android:process=":remote" >
             <intent-filter>
-
                 <!-- The interfaces supported by the service which we can bind to. -->
                 <action android:name="edu.cmu.cs.cs446.wifibuffer.IWifiBufferService" />
                 <!-- Used to select the service without explicitly supplying the implementation class. -->
@@ -25,27 +32,8 @@
         </service>
 
         <activity
-            android:name="edu.cmu.cs.cs446.wifibuffer.WifiBufferService$Controller"
-            android:label="@string/activity_remote_service_controller"
-            android:launchMode="singleTop" >
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.SAMPLE_CODE" />
-            </intent-filter>
-        </activity>
-        <activity
-            android:name="edu.cmu.cs.cs446.wifibuffer.WifiBufferService$Binding"
-            android:label="@string/activity_remote_service_binding" >
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.SAMPLE_CODE" />
-            </intent-filter>
-        </activity>
-        <activity
-            android:name="edu.cmu.cs.cs446.wifibuffer.WifiBufferService$BindingOptions"
-            android:label="@string/activity_remote_service_binding_options" >
+            android:name="edu.cmu.cs.cs446.wifibuffer.client.ClientActivity"
+            android:label="@string/activity_remote_service_binding">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

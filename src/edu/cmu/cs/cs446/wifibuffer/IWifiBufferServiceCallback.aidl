@@ -9,5 +9,5 @@ oneway interface IWifiBufferServiceCallback {
     /**
      * Called when the service has a new value for you.
      */
-    void valueChanged(int value);
+    void onServiceResponse(String data);
 }
