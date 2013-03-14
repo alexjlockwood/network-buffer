@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -24,7 +25,8 @@ import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
 @SuppressLint("HandlerLeak")
 public class WifiBufferService extends Service {
 
-  private static final int REPORT_MSG = 1;
+  static final int REPORT_MSG = 1;
+  static final int REPORT_RESPONSE = 2;
 
   /**
    * Our Handler used to execute operations on the main thread. This is used to
@@ -38,8 +40,8 @@ public class WifiBufferService extends Service {
           int value = mValue++;
 
           // Broadcast to all clients the new value.
-          final int numCallbacks = mCallbacks.beginBroadcast();
-          for (int i = 0; i < numCallbacks; i++) {
+          int N = mCallbacks.beginBroadcast();
+          for (int i = 0; i < N; i++) {
             try {
               mCallbacks.getBroadcastItem(i).onServiceResponse("" + value);
             } catch (RemoteException e) {
@@ -51,8 +53,23 @@ public class WifiBufferService extends Service {
 
           // Repeat every 1 second.
           sendMessageDelayed(obtainMessage(REPORT_MSG), 1 * 1000);
-        }
           break;
+        }
+        case REPORT_RESPONSE: {
+          String response = (String) msg.obj;
+          
+          int N = mCallbacks.beginBroadcast();
+          for (int i = 0; i < N; i++) {
+            try {
+              mCallbacks.getBroadcastItem(i).onServiceResponse(response);
+            } catch (RemoteException e) {
+              // The RemoteCallbackList will take care of removing
+              // the dead object for us.
+            }
+          }
+          mCallbacks.finishBroadcast();
+          break;
+        }
         default:
           super.handleMessage(msg);
       }
@@ -77,7 +94,8 @@ public class WifiBufferService extends Service {
     // While this service is running, it will continually increment a
     // number. Send the first message that is used to perform the
     // increment.
-    mHandler.sendEmptyMessage(REPORT_MSG);
+    
+    // mHandler.sendEmptyMessage(REPORT_MSG);
   }
 
   @Override
@@ -94,6 +112,7 @@ public class WifiBufferService extends Service {
     // Remove the next pending message to increment the counter, stopping
     // the increment loop.
     mHandler.removeMessages(REPORT_MSG);
+    mHandler.removeMessages(REPORT_RESPONSE);
   }
 
   @Override
@@ -117,6 +136,17 @@ public class WifiBufferService extends Service {
       if (cb != null) {
         mCallbacks.unregister(cb);
       }
+    }
+
+    @Override
+    public void sendRequest(final String url) {
+      mHandler.postDelayed(new Runnable() {
+        @Override
+        public void run() {
+          SimpleRequestTask task = new SimpleRequestTask(mHandler);
+          task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, url);
+        }
+      }, 2000);
     }
   };
 

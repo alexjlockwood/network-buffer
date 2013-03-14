@@ -3,6 +3,7 @@
     <string name="app_name">WifiBuffer</string>
     <string name="bind_service">Bind Service</string>
     <string name="unbind_service">Unbind Service</string>
+    <string name="network_request">Perform request</string>
     <string name="remote_service_started">Remote service has started</string>
     <string name="remote_service_stopped">Remote service has stopped</string>
     <string name="remote_service_label">WifiBuffer Service</string>

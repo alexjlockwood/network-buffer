@@ -33,6 +33,7 @@ public class ClientActivity extends Activity {
    */
   private IWifiBufferService mService = null;
   private TextView mTextView;
+  private TextView mResponseTextView;
   private boolean mIsBound;
 
   /**
@@ -49,9 +50,15 @@ public class ClientActivity extends Activity {
     
     Button unBindButton = (Button) findViewById(R.id.unbind);
     unBindButton.setOnClickListener(mUnbindListener);
+    
+    Button requestButton = (Button) findViewById(R.id.request);
+    requestButton.setOnClickListener(mRequestListener);
 
     mTextView = (TextView) findViewById(R.id.callback);
     mTextView.setText("Not attached.");
+    
+    mResponseTextView = (TextView) findViewById(R.id.response);
+    mResponseTextView.setText("No response yet.");
   }
 
   @Override
@@ -137,6 +144,22 @@ public class ClientActivity extends Activity {
       }
     }
   };
+  
+  private final OnClickListener mRequestListener = new OnClickListener() {
+    @Override
+    public void onClick(View v) {
+      if (mIsBound) {
+        if (mService != null) {
+          try {
+            mService.sendRequest("blah blah blah");
+          } catch (RemoteException e) {
+            // There is nothing special we need to do if the service
+            // has crashed.
+          }
+        }
+      }
+    }
+  };
 
   // ----------------------------------------------------------------------
   // Code showing how to deal with callbacks.
@@ -155,11 +178,13 @@ public class ClientActivity extends Activity {
      */
     @Override
     public void onServiceResponse(String data) {
-      mHandler.sendMessage(mHandler.obtainMessage(BUMP_MSG, Integer.valueOf(data), 0));
+      Message msg = mHandler.obtainMessage(BUMP_RESPONSE, data);
+      mHandler.sendMessage(msg);
     }
   };
 
   private static final int BUMP_MSG = 1;
+  private static final int BUMP_RESPONSE = 2;
 
   private final Handler mHandler = new Handler() {
     @Override
@@ -167,6 +192,9 @@ public class ClientActivity extends Activity {
       switch (msg.what) {
         case BUMP_MSG:
           mTextView.setText("Received from service: " + msg.arg1);
+          break;
+        case BUMP_RESPONSE:
+          mResponseTextView.setText((String) msg.obj);
           break;
         default:
           super.handleMessage(msg);
