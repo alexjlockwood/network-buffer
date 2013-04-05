@@ -7,13 +7,13 @@ import android.app.Service;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.widget.Toast;
+import edu.cmu.cs.cs446.wifibuffer.RequestQueueThread.RequestQueueCallback;
 import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
 
 /**
@@ -23,96 +23,31 @@ import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
  * how to interact with the service.
  */
 @SuppressLint("HandlerLeak")
-public class WifiBufferService extends Service {
+public class WifiBufferService extends Service implements RequestQueueCallback {
+  @SuppressWarnings("unused")
+  private static final String TAG = WifiBufferService.class.getSimpleName();
+  private static final int RESPOND_TO_CLIENT = 0;
 
-  static final int REPORT_MSG = 1;
-  static final int REPORT_RESPONSE = 2;
-
-  /**
-   * Our Handler used to execute operations on the main thread. This is used to
-   * schedule increments of our value.
-   */
-  private final Handler mHandler = new Handler() {
-    @Override
-    public void handleMessage(Message msg) {
-      switch (msg.what) {
-        case REPORT_MSG: {
-          int value = mValue++;
-
-          // Broadcast to all clients the new value.
-          int N = mCallbacks.beginBroadcast();
-          for (int i = 0; i < N; i++) {
-            try {
-              mCallbacks.getBroadcastItem(i).onServiceResponse("" + value);
-            } catch (RemoteException e) {
-              // The RemoteCallbackList will take care of removing
-              // the dead object for us.
-            }
-          }
-          mCallbacks.finishBroadcast();
-
-          // Repeat every 1 second.
-          sendMessageDelayed(obtainMessage(REPORT_MSG), 1 * 1000);
-          break;
-        }
-        case REPORT_RESPONSE: {
-          String response = (String) msg.obj;
-          
-          int N = mCallbacks.beginBroadcast();
-          for (int i = 0; i < N; i++) {
-            try {
-              mCallbacks.getBroadcastItem(i).onServiceResponse(response);
-            } catch (RemoteException e) {
-              // The RemoteCallbackList will take care of removing
-              // the dead object for us.
-            }
-          }
-          mCallbacks.finishBroadcast();
-          break;
-        }
-        default:
-          super.handleMessage(msg);
-      }
-    }
-  };
-
-  /**
-   * A list of callbacks that have been registered with the service.
-   */
+  /** A list of callbacks that have been registered with the service. */
   private RemoteCallbackList<IWifiBufferServiceCallback> mCallbacks = new RemoteCallbackList<IWifiBufferServiceCallback>();
-
-  private int mValue = 0;
-  private NotificationManager mNM;
+  private NotificationManager mNotificationManager;
+  private RequestQueueThread mThread;
 
   @Override
   public void onCreate() {
-    mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-
-    // Display a notification about us starting.
+    mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     showNotification();
-
-    // While this service is running, it will continually increment a
-    // number. Send the first message that is used to perform the
-    // increment.
-    
-    // mHandler.sendEmptyMessage(REPORT_MSG);
+    mThread = new RequestQueueThread(this);
+    mThread.start();
   }
 
   @Override
   public void onDestroy() {
-    // Cancel the persistent notification.
-    mNM.cancel(R.string.remote_service_started);
-
-    // Tell the user we stopped.
+    mNotificationManager.cancel(R.string.remote_service_started);
     Toast.makeText(this, R.string.remote_service_stopped, Toast.LENGTH_SHORT).show();
-
-    // Unregister all callbacks.
     mCallbacks.kill();
-
-    // Remove the next pending message to increment the counter, stopping
-    // the increment loop.
-    mHandler.removeMessages(REPORT_MSG);
-    mHandler.removeMessages(REPORT_RESPONSE);
+    mHandler.removeMessages(RESPOND_TO_CLIENT);
+    mThread.close();
   }
 
   @Override
@@ -120,8 +55,13 @@ public class WifiBufferService extends Service {
     return mBinder;
   }
 
+  @Override
+  public void onTaskRemoved(Intent rootIntent) {
+    Toast.makeText(this, "Task removed: " + rootIntent, Toast.LENGTH_LONG).show();
+  }
+
   /**
-   * The remote interface is defined through IDL.
+   * The remote interface is defined through AIDL.
    */
   private final IWifiBufferService.Stub mBinder = new IWifiBufferService.Stub() {
     @Override
@@ -139,40 +79,56 @@ public class WifiBufferService extends Service {
     }
 
     @Override
-    public void sendRequest(final String url) {
-      mHandler.postDelayed(new Runnable() {
-        @Override
-        public void run() {
-          SimpleRequestTask task = new SimpleRequestTask(mHandler);
-          task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, url);
-        }
-      }, 2000);
+    public void send(Request request) {
+      mThread.invokeLater(request);
     }
   };
 
   @Override
-  public void onTaskRemoved(Intent rootIntent) {
-    Toast.makeText(this, "Task removed: " + rootIntent, Toast.LENGTH_LONG).show();
+  public void onRequestComplete(Response response) {
+    mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
   }
 
   /**
    * Show a notification while this service is running.
    */
   private void showNotification() {
-    Bitmap largeIcon = BitmapFactory.decodeResource(getResources(),
-        R.drawable.device_access_network_wifi);
+    Bitmap largeIcon = BitmapFactory.decodeResource(getResources(), R.drawable.device_access_network_wifi);
 
     @SuppressWarnings("deprecation")
-    Notification notification = new Notification.Builder(this)
-        .setSmallIcon(R.drawable.device_access_network_wifi)
-        .setLargeIcon(largeIcon)
-        .setContentTitle(getText(R.string.remote_service_label))
-        .setContentText(getText(R.string.remote_service_started))
-        .setWhen(System.currentTimeMillis())
-        .getNotification();
+    Notification notification = new Notification.Builder(this).setSmallIcon(R.drawable.device_access_network_wifi)
+        .setLargeIcon(largeIcon).setContentTitle(getText(R.string.remote_service_label))
+        .setContentText(getText(R.string.remote_service_started)).setWhen(System.currentTimeMillis()).getNotification();
 
     // Send the notification. We use a string id because it is a unique number.
     // We use it later to cancel.
-    mNM.notify(R.string.remote_service_started, notification);
+    mNotificationManager.notify(R.string.remote_service_started, notification);
   }
+
+  /**
+   * Our Handler used to execute operations on the main thread. This is used to
+   * schedule increments of our value.
+   */
+  private final Handler mHandler = new Handler() {
+    @Override
+    public void handleMessage(Message msg) {
+      switch (msg.what) {
+        case RESPOND_TO_CLIENT: {
+          // Broadcast to all clients the new value.
+          for (int i = 0; i < mCallbacks.beginBroadcast(); i++) {
+            try {
+              mCallbacks.getBroadcastItem(i).receive((Response) msg.obj);
+            } catch (RemoteException e) {
+              // The RemoteCallbackList will take care of removing
+              // the dead object for us.
+            }
+          }
+          mCallbacks.finishBroadcast();
+          break;
+        }
+        default:
+          super.handleMessage(msg);
+      }
+    }
+  };
 }

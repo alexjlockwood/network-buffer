@@ -1,5 +1,6 @@
 package edu.cmu.cs.cs446.wifibuffer;
 
+import edu.cmu.cs.cs446.wifibuffer.Request;
 import edu.cmu.cs.cs446.wifibuffer.IWifiBufferServiceCallback;
 
 /**
@@ -22,5 +23,5 @@ interface IWifiBufferService {
      * Send a simple network request to be performed asynchronously
      * by the service (at some point in the near future).
      */
-	void sendRequest(String url);
+	void send(in Request request);
 }
