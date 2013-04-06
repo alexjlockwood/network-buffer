@@ -16,12 +16,9 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Log;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.networkbuffer.Request.DelayedRequest;
+import edu.cmu.cs.cs446.networkbuffer.RequestExecutor.DelayedRequest;
 import edu.cmu.cs.cs446.networkbuffer.RequestExecutor.RequestCallback;
 import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
-import edu.cmu.cs.cs446.networkbuffer.INetworkService;
-import edu.cmu.cs.cs446.networkbuffer.INetworkServiceCallback;
-import edu.cmu.cs.cs446.networkbuffer.R;
 
 /**
  * This is an example of implementing an application service that runs in a
@@ -32,28 +29,27 @@ import edu.cmu.cs.cs446.networkbuffer.R;
 @SuppressLint("HandlerLeak")
 public class NetworkService extends Service implements RequestCallback {
   private static final String TAG = NetworkService.class.getSimpleName();
-  private static final int RESPOND_TO_CLIENT = 0;
 
+  private static final int RESPOND_TO_CLIENT = 0;
+  private RemoteCallbackList<INetworkServiceCallback> mCallbacks;
+  private NotificationManager mNotificationManager;
   private DelayQueue<DelayedRequest> mDelayQueue;
   private RequestExecutor mThread;
-
-  /** A list of callbacks that have been registered with the service. */
-  private RemoteCallbackList<INetworkServiceCallback> mCallbacks = new RemoteCallbackList<INetworkServiceCallback>();
-  private NotificationManager mNotificationManager;
 
   @Override
   public void onCreate() {
     mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-    showNotification();
+    mCallbacks = new RemoteCallbackList<INetworkServiceCallback>();
     mDelayQueue = new DelayQueue<DelayedRequest>();
     mThread = new RequestExecutor(mDelayQueue, this);
     mThread.start();
+    showNotification();
   }
 
   @Override
   public void onDestroy() {
-    mNotificationManager.cancel(R.string.remote_service_started);
     Toast.makeText(this, R.string.remote_service_stopped, Toast.LENGTH_SHORT).show();
+    mNotificationManager.cancel(R.string.remote_service_started);
     mCallbacks.kill();
     mHandler.removeMessages(RESPOND_TO_CLIENT);
     mThread.close();
@@ -69,32 +65,28 @@ public class NetworkService extends Service implements RequestCallback {
     Toast.makeText(this, "Task removed: " + rootIntent, Toast.LENGTH_LONG).show();
   }
 
-  /**
-   * The remote interface is defined through AIDL.
-   */
   private final INetworkService.Stub mBinder = new INetworkService.Stub() {
     @Override
-    public void registerCallback(INetworkServiceCallback cb) {
-      if (cb != null) {
-        mCallbacks.register(cb);
+    public void registerCallback(INetworkServiceCallback callback) {
+      if (callback != null) {
+        mCallbacks.register(callback);
       }
     }
 
     @Override
-    public void unregisterCallback(INetworkServiceCallback cb) {
-      if (cb != null) {
-        mCallbacks.unregister(cb);
+    public void unregisterCallback(INetworkServiceCallback callback) {
+      if (callback != null) {
+        mCallbacks.unregister(callback);
       }
     }
 
     @Override
     public void send(Request request) {
       Log.i(TAG, "Service received request: " + request.toString());
-      mDelayQueue.put(new DelayedRequest(request));
-      mDelayQueue.put(new DelayedRequest(request));
-      mDelayQueue.put(new DelayedRequest(request));
-      mDelayQueue.put(new DelayedRequest(request));
-      mDelayQueue.put(new DelayedRequest(request));
+      // Queue up 10 dummy requests in rapid succession
+      for (int i=0; i<10; i++) {
+        mDelayQueue.put(new DelayedRequest(request));
+      }
     }
   };
 
@@ -113,7 +105,7 @@ public class NetworkService extends Service implements RequestCallback {
     public void handleMessage(Message msg) {
       switch (msg.what) {
         case RESPOND_TO_CLIENT: {
-          // Broadcast to all clients the new value.
+          // TODO: Broadcast requests to the original calling client only...
           final int N = mCallbacks.beginBroadcast();
           for (int i = 0; i < N; i++) {
             try {
@@ -139,9 +131,13 @@ public class NetworkService extends Service implements RequestCallback {
     Bitmap largeIcon = BitmapFactory.decodeResource(getResources(), R.drawable.device_access_network_wifi);
 
     @SuppressWarnings("deprecation")
-    Notification notification = new Notification.Builder(this).setSmallIcon(R.drawable.device_access_network_wifi)
-        .setLargeIcon(largeIcon).setContentTitle(getText(R.string.remote_service_label))
-        .setContentText(getText(R.string.remote_service_started)).setWhen(System.currentTimeMillis()).getNotification();
+    Notification notification = new Notification.Builder(this)
+        .setSmallIcon(R.drawable.device_access_network_wifi)
+        .setLargeIcon(largeIcon)
+        .setContentTitle(getText(R.string.remote_service_label))
+        .setContentText(getText(R.string.remote_service_started))
+        .setWhen(System.currentTimeMillis())
+        .getNotification();
 
     // Send the notification. We use a string id because it is a unique number.
     // We use it later to cancel.

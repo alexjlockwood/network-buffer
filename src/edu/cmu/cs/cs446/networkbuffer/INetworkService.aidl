@@ -12,12 +12,12 @@ interface INetworkService {
     /**
      * Register the callback interface with the service.
      */
-    void registerCallback(INetworkServiceCallback cb);
+    void registerCallback(INetworkServiceCallback callback);
 
     /**
      * Unregister the callback interface with the service.
      */
-    void unregisterCallback(INetworkServiceCallback cb);
+    void unregisterCallback(INetworkServiceCallback callback);
 
     /**
      * Send a simple network request to be performed asynchronously
