@@ -1,23 +1,23 @@
-package edu.cmu.cs.cs446.wifibuffer;
+package edu.cmu.cs.cs446.networkbuffer;
 
-import edu.cmu.cs.cs446.wifibuffer.Request;
-import edu.cmu.cs.cs446.wifibuffer.IWifiBufferServiceCallback;
+import edu.cmu.cs.cs446.networkbuffer.Request;
+import edu.cmu.cs.cs446.networkbuffer.INetworkServiceCallback;
 
 /**
- * Defines an interface for calling the remote wifi buffer service 
+ * Defines an interface for calling the remote network service 
  * (which runs in a separate process).
  */
-interface IWifiBufferService {
+interface INetworkService {
 
     /**
      * Register the callback interface with the service.
      */
-    void registerCallback(IWifiBufferServiceCallback cb);
+    void registerCallback(INetworkServiceCallback cb);
 
     /**
      * Unregister the callback interface with the service.
      */
-    void unregisterCallback(IWifiBufferServiceCallback cb);
+    void unregisterCallback(INetworkServiceCallback cb);
 
     /**
      * Send a simple network request to be performed asynchronously

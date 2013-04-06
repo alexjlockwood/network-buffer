@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="edu.cmu.cs.cs446.wifibuffer"
+    package="edu.cmu.cs.cs446.networkbuffer"
     android:versionCode="1"
     android:versionName="1.0" >
 
@@ -17,23 +17,22 @@
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
-        
         <service
-            android:name="edu.cmu.cs.cs446.wifibuffer.WifiBufferService"
+            android:name="edu.cmu.cs.cs446.networkbuffer.NetworkService"
             android:exported="true"
             android:permission="android.permission.INTERNET"
             android:process=":remote" >
             <intent-filter>
                 <!-- The interfaces supported by the service which we can bind to. -->
-                <action android:name="edu.cmu.cs.cs446.wifibuffer.IWifiBufferService" />
+                <action android:name="edu.cmu.cs.cs446.networkbuffer.INetworkService" />
                 <!-- Used to select the service without explicitly supplying the implementation class. -->
-                <action android:name="edu.cmu.cs.cs446.wifibuffer.REMOTE_SERVICE" />
+                <action android:name="edu.cmu.cs.cs446.networkbuffer.REMOTE_SERVICE" />
             </intent-filter>
         </service>
 
         <activity
-            android:name="edu.cmu.cs.cs446.wifibuffer.client.ClientActivity"
-            android:label="@string/activity_remote_service_binding">
+            android:name="edu.cmu.cs.cs446.networkbuffer.client.ClientActivity"
+            android:label="@string/activity_remote_service_binding" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

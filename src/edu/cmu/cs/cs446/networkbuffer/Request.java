@@ -1,4 +1,4 @@
-package edu.cmu.cs.cs446.wifibuffer;
+package edu.cmu.cs.cs446.networkbuffer;
 
 import java.util.Arrays;
 import java.util.concurrent.Delayed;

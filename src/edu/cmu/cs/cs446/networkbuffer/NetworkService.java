@@ -1,4 +1,4 @@
-package edu.cmu.cs.cs446.wifibuffer;
+package edu.cmu.cs.cs446.networkbuffer;
 
 import java.util.concurrent.DelayQueue;
 
@@ -16,9 +16,12 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Log;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.wifibuffer.Request.DelayedRequest;
-import edu.cmu.cs.cs446.wifibuffer.RequestExecutor.RequestCallback;
-import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
+import edu.cmu.cs.cs446.networkbuffer.Request.DelayedRequest;
+import edu.cmu.cs.cs446.networkbuffer.RequestExecutor.RequestCallback;
+import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
+import edu.cmu.cs.cs446.networkbuffer.INetworkService;
+import edu.cmu.cs.cs446.networkbuffer.INetworkServiceCallback;
+import edu.cmu.cs.cs446.networkbuffer.R;
 
 /**
  * This is an example of implementing an application service that runs in a
@@ -27,15 +30,15 @@ import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
  * how to interact with the service.
  */
 @SuppressLint("HandlerLeak")
-public class WifiBufferService extends Service implements RequestCallback {
-  private static final String TAG = WifiBufferService.class.getSimpleName();
+public class NetworkService extends Service implements RequestCallback {
+  private static final String TAG = NetworkService.class.getSimpleName();
   private static final int RESPOND_TO_CLIENT = 0;
 
   private DelayQueue<DelayedRequest> mDelayQueue;
   private RequestExecutor mThread;
 
   /** A list of callbacks that have been registered with the service. */
-  private RemoteCallbackList<IWifiBufferServiceCallback> mCallbacks = new RemoteCallbackList<IWifiBufferServiceCallback>();
+  private RemoteCallbackList<INetworkServiceCallback> mCallbacks = new RemoteCallbackList<INetworkServiceCallback>();
   private NotificationManager mNotificationManager;
 
   @Override
@@ -69,16 +72,16 @@ public class WifiBufferService extends Service implements RequestCallback {
   /**
    * The remote interface is defined through AIDL.
    */
-  private final IWifiBufferService.Stub mBinder = new IWifiBufferService.Stub() {
+  private final INetworkService.Stub mBinder = new INetworkService.Stub() {
     @Override
-    public void registerCallback(IWifiBufferServiceCallback cb) {
+    public void registerCallback(INetworkServiceCallback cb) {
       if (cb != null) {
         mCallbacks.register(cb);
       }
     }
 
     @Override
-    public void unregisterCallback(IWifiBufferServiceCallback cb) {
+    public void unregisterCallback(INetworkServiceCallback cb) {
       if (cb != null) {
         mCallbacks.unregister(cb);
       }

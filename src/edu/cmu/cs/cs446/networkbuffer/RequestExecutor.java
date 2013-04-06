@@ -1,9 +1,9 @@
-package edu.cmu.cs.cs446.wifibuffer;
+package edu.cmu.cs.cs446.networkbuffer;
 
 import java.util.concurrent.DelayQueue;
 
 import android.util.Log;
-import edu.cmu.cs.cs446.wifibuffer.Request.DelayedRequest;
+import edu.cmu.cs.cs446.networkbuffer.Request.DelayedRequest;
 
 public class RequestExecutor extends Thread {
   private static final String TAG = RequestExecutor.class.getSimpleName();

@@ -1,4 +1,4 @@
-package edu.cmu.cs.cs446.wifibuffer.client;
+package edu.cmu.cs.cs446.networkbuffer.client;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -14,11 +14,11 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.wifibuffer.IWifiBufferService;
-import edu.cmu.cs.cs446.wifibuffer.IWifiBufferServiceCallback;
-import edu.cmu.cs.cs446.wifibuffer.R;
-import edu.cmu.cs.cs446.wifibuffer.Request;
-import edu.cmu.cs.cs446.wifibuffer.Response;
+import edu.cmu.cs.cs446.networkbuffer.Request;
+import edu.cmu.cs.cs446.networkbuffer.Response;
+import edu.cmu.cs.cs446.networkbuffer.INetworkService;
+import edu.cmu.cs.cs446.networkbuffer.INetworkServiceCallback;
+import edu.cmu.cs.cs446.networkbuffer.R;
 
 /**
  * Example of binding and unbinding to the remote service. This demonstrates the
@@ -29,7 +29,7 @@ public class ClientActivity extends Activity {
   private static final String TAG = ClientActivity.class.getSimpleName();
 
   /** The primary interface we will be calling on the service. */
-  private IWifiBufferService mService = null;
+  private INetworkService mService = null;
   private TextView mTextView;
   private TextView mResponseTextView;
   private boolean mIsBound;
@@ -53,7 +53,7 @@ public class ClientActivity extends Activity {
         // by interface names. This allows other applications to be
         // installed that replace the remote service by implementing
         // the same interface.
-        Intent intent = new Intent(IWifiBufferService.class.getName());
+        Intent intent = new Intent(INetworkService.class.getName());
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
         mIsBound = true;
         mTextView.setText("Binding.");
@@ -74,7 +74,7 @@ public class ClientActivity extends Activity {
           }
           unbindService(mConnection);
           mIsBound = false;
-          mTextView.setText("Unbinding.");
+          mTextView.setText("Not attached.");
         }
       }
     });
@@ -83,13 +83,15 @@ public class ClientActivity extends Activity {
     requestButton.setOnClickListener(new OnClickListener() {
       @Override
       public void onClick(View v) {
-        if (mIsBound && mService != null) {
-          try {
-            Request request = new Request("unix11.andrew.cmu.edu", 18001, "asdf".getBytes());
-            Log.i(TAG, "Client sending request: " + request.toString());
-            mService.send(request);
-          } catch (RemoteException ignore) {
-            // The service has crashed.
+        if (mIsBound) {
+          if (mService != null) {
+            try {
+              Request request = new Request("unix11.andrew.cmu.edu", 18001, "asdf".getBytes());
+              Log.i(TAG, "Client sending request: " + request.toString());
+              mService.send(request);
+            } catch (RemoteException ignore) {
+              // The service has crashed.
+            }
           }
         }
       }
@@ -122,7 +124,7 @@ public class ClientActivity extends Activity {
       // interact with the service. We are communicating with our
       // service through an IDL interface, so get a client-side
       // representation of that from the raw service object.
-      mService = IWifiBufferService.Stub.asInterface(service);
+      mService = INetworkService.Stub.asInterface(service);
       mTextView.setText("Attached.");
 
       // Monitor the service for as long as we are connected to it.
@@ -150,7 +152,7 @@ public class ClientActivity extends Activity {
   /**
    * Rceives callbacks from the remote service.
    */
-  private final IWifiBufferServiceCallback mCallback = new IWifiBufferServiceCallback.Stub() {
+  private final INetworkServiceCallback mCallback = new INetworkServiceCallback.Stub() {
 
     /**
      * Called by the remote service on a background thread.
