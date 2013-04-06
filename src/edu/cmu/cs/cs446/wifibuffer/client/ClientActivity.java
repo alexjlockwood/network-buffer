@@ -8,6 +8,7 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -25,12 +26,15 @@ import edu.cmu.cs.cs446.wifibuffer.Response;
  * it through an aidl interface.
  */
 public class ClientActivity extends Activity {
+  private static final String TAG = ClientActivity.class.getSimpleName();
 
   /** The primary interface we will be calling on the service. */
   private IWifiBufferService mService = null;
   private TextView mTextView;
   private TextView mResponseTextView;
   private boolean mIsBound;
+
+  private int mValue = 0;
 
   /**
    * Standard initialization of this activity. Set up the UI, then wait for the
@@ -60,16 +64,18 @@ public class ClientActivity extends Activity {
     unBindButton.setOnClickListener(new OnClickListener() {
       @Override
       public void onClick(View v) {
-        if (mIsBound && mService != null) {
-          try {
-            mService.unregisterCallback(mCallback);
-          } catch (RemoteException ignore) {
-            // The service has crashed.
+        if (mIsBound) {
+          if (mService != null) {
+            try {
+              mService.unregisterCallback(mCallback);
+            } catch (RemoteException ignore) {
+              // The service has crashed.
+            }
           }
+          unbindService(mConnection);
+          mIsBound = false;
+          mTextView.setText("Unbinding.");
         }
-        unbindService(mConnection);
-        mIsBound = false;
-        mTextView.setText("Unbinding.");
       }
     });
 
@@ -80,6 +86,7 @@ public class ClientActivity extends Activity {
         if (mIsBound && mService != null) {
           try {
             Request request = new Request("unix11.andrew.cmu.edu", 18001, "asdf".getBytes());
+            Log.i(TAG, "Client sending request: " + request.toString());
             mService.send(request);
           } catch (RemoteException ignore) {
             // The service has crashed.
@@ -150,10 +157,12 @@ public class ClientActivity extends Activity {
      */
     @Override
     public void receive(final Response response) {
+      Log.i(TAG, "Received " + response.toString());
       runOnUiThread(new Runnable() {
         @Override
         public void run() {
-          mResponseTextView.setText(new String((byte[]) response.getPayload()));
+          mValue++;
+          mResponseTextView.setText("Received " + mValue + " responses.");
         }
       });
     }

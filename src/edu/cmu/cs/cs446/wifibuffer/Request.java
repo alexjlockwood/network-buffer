@@ -1,5 +1,9 @@
 package edu.cmu.cs.cs446.wifibuffer;
 
+import java.util.Arrays;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
+
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -66,4 +70,69 @@ public class Request implements Parcelable {
       return new Request[size];
     }
   };
+
+  @Override
+  public String toString() {
+    return "[dstName=" + mDstName + ", dstPort=" + mDstPort + ", payload=" + new String(mPayload) + "]";
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof Request)) {
+      return false;
+    }
+    Request other = (Request) o;
+    return mDstName.equals(other.mDstName) && mDstPort == other.mDstPort && Arrays.equals(mPayload, other.mPayload);
+  }
+
+  @Override
+  public int hashCode() {
+    // TODO: don't be dumb
+    return toString().hashCode();
+  }
+
+  static class DelayedRequest implements Delayed {
+    private final long mOrigin;
+    private final long mDelay;
+    private final Request mRequest;
+
+    public DelayedRequest(Request request) {
+      mOrigin = System.currentTimeMillis();
+      mDelay = 5000 - (mOrigin % 5000);
+      mRequest = request;
+    }
+
+    public Request getRequest() {
+      return mRequest;
+    }
+
+    @Override
+    public long getDelay(TimeUnit unit) {
+      return unit.convert(mDelay - (System.currentTimeMillis() - mOrigin), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public int compareTo(Delayed delayed) {
+      if (this == delayed) return 0;
+
+      long diff;
+      if (delayed instanceof DelayedRequest) {
+        diff = mDelay - ((DelayedRequest) delayed).mDelay;
+      } else {
+        diff = (getDelay(TimeUnit.MILLISECONDS) - delayed.getDelay(TimeUnit.MILLISECONDS));
+      }
+
+      if (diff > 0) return 1;
+      if (diff < 0) return -1;
+      return 0;
+    }
+
+  }
+
+  public Response execute() {
+    return new Response(mPayload);
+  }
 }

@@ -1,5 +1,7 @@
 package edu.cmu.cs.cs446.wifibuffer;
 
+import java.util.concurrent.DelayQueue;
+
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -12,8 +14,10 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
+import android.util.Log;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.wifibuffer.RequestQueueThread.RequestQueueCallback;
+import edu.cmu.cs.cs446.wifibuffer.Request.DelayedRequest;
+import edu.cmu.cs.cs446.wifibuffer.RequestExecutor.RequestCallback;
 import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
 
 /**
@@ -23,21 +27,23 @@ import edu.cmu.cs.cs446.wifibuffer.client.ClientActivity;
  * how to interact with the service.
  */
 @SuppressLint("HandlerLeak")
-public class WifiBufferService extends Service implements RequestQueueCallback {
-  @SuppressWarnings("unused")
+public class WifiBufferService extends Service implements RequestCallback {
   private static final String TAG = WifiBufferService.class.getSimpleName();
   private static final int RESPOND_TO_CLIENT = 0;
+
+  private DelayQueue<DelayedRequest> mDelayQueue;
+  private RequestExecutor mThread;
 
   /** A list of callbacks that have been registered with the service. */
   private RemoteCallbackList<IWifiBufferServiceCallback> mCallbacks = new RemoteCallbackList<IWifiBufferServiceCallback>();
   private NotificationManager mNotificationManager;
-  private RequestQueueThread mThread;
 
   @Override
   public void onCreate() {
     mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     showNotification();
-    mThread = new RequestQueueThread(this);
+    mDelayQueue = new DelayQueue<DelayedRequest>();
+    mThread = new RequestExecutor(mDelayQueue, this);
     mThread.start();
   }
 
@@ -80,14 +86,48 @@ public class WifiBufferService extends Service implements RequestQueueCallback {
 
     @Override
     public void send(Request request) {
-      mThread.invokeLater(request);
+      Log.i(TAG, "Service received request: " + request.toString());
+      mDelayQueue.put(new DelayedRequest(request));
+      mDelayQueue.put(new DelayedRequest(request));
+      mDelayQueue.put(new DelayedRequest(request));
+      mDelayQueue.put(new DelayedRequest(request));
+      mDelayQueue.put(new DelayedRequest(request));
     }
   };
 
   @Override
   public void onRequestComplete(Response response) {
+    Log.i(TAG, "Dispatching response to client: " + response.toString());
     mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
   }
+
+  /**
+   * Our Handler used to execute operations on the main thread. This is used to
+   * schedule increments of our value.
+   */
+  private final Handler mHandler = new Handler() {
+    @Override
+    public void handleMessage(Message msg) {
+      switch (msg.what) {
+        case RESPOND_TO_CLIENT: {
+          // Broadcast to all clients the new value.
+          final int N = mCallbacks.beginBroadcast();
+          for (int i = 0; i < N; i++) {
+            try {
+              mCallbacks.getBroadcastItem(i).receive((Response) msg.obj);
+            } catch (RemoteException e) {
+              // The RemoteCallbackList will take care of removing
+              // the dead object for us.
+            }
+          }
+          mCallbacks.finishBroadcast();
+          break;
+        }
+        default:
+          super.handleMessage(msg);
+      }
+    }
+  };
 
   /**
    * Show a notification while this service is running.
@@ -104,31 +144,4 @@ public class WifiBufferService extends Service implements RequestQueueCallback {
     // We use it later to cancel.
     mNotificationManager.notify(R.string.remote_service_started, notification);
   }
-
-  /**
-   * Our Handler used to execute operations on the main thread. This is used to
-   * schedule increments of our value.
-   */
-  private final Handler mHandler = new Handler() {
-    @Override
-    public void handleMessage(Message msg) {
-      switch (msg.what) {
-        case RESPOND_TO_CLIENT: {
-          // Broadcast to all clients the new value.
-          for (int i = 0; i < mCallbacks.beginBroadcast(); i++) {
-            try {
-              mCallbacks.getBroadcastItem(i).receive((Response) msg.obj);
-            } catch (RemoteException e) {
-              // The RemoteCallbackList will take care of removing
-              // the dead object for us.
-            }
-          }
-          mCallbacks.finishBroadcast();
-          break;
-        }
-        default:
-          super.handleMessage(msg);
-      }
-    }
-  };
 }
