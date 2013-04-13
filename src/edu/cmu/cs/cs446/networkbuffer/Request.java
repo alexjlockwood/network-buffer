@@ -1,11 +1,12 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
 import java.util.Arrays;
+import java.util.concurrent.Callable;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 
-public class Request implements Parcelable {
+public class Request implements Parcelable, Callable<Response> {
 
   public static final int PRIORITY_LOW = 0;
   public static final int PRIORITY_HIGH = 1;
@@ -92,7 +93,8 @@ public class Request implements Parcelable {
     return toString().hashCode();
   }
 
-  public Response execute() {
+  @Override
+  public Response call() throws Exception {
     return new Response(mPayload);
   }
 }

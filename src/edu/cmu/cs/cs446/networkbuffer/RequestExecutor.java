@@ -29,7 +29,12 @@ class RequestExecutor extends Thread {
         DelayedRequest delayed = mDelayQueue.take();
         Request request = delayed.getRequest();
         Log.i(TAG, "Background daemon found new delayed request: " + request.toString());
-        Response response = request.execute();
+        Response response = null;
+        try {
+          response = request.call();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
         Log.i(TAG, "Background daemon executed request and received response: " + response.toString());
         mCallback.onRequestComplete(response);
       } catch (InterruptedException e) {
@@ -90,7 +95,7 @@ class RequestExecutor extends Thread {
       if (delayed instanceof DelayedRequest) {
         diff = mDelay - ((DelayedRequest) delayed).mDelay;
       } else {
-        diff = (getDelay(TimeUnit.MILLISECONDS) - delayed.getDelay(TimeUnit.MILLISECONDS));
+        diff = getDelay(TimeUnit.MILLISECONDS) - delayed.getDelay(TimeUnit.MILLISECONDS);
       }
 
       if (diff > 0)
