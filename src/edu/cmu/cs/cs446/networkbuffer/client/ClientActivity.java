@@ -14,11 +14,11 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.networkbuffer.Request;
-import edu.cmu.cs.cs446.networkbuffer.Response;
 import edu.cmu.cs.cs446.networkbuffer.INetworkService;
 import edu.cmu.cs.cs446.networkbuffer.INetworkServiceCallback;
 import edu.cmu.cs.cs446.networkbuffer.R;
+import edu.cmu.cs.cs446.networkbuffer.Request;
+import edu.cmu.cs.cs446.networkbuffer.Response;
 
 /**
  * Example of binding and unbinding to the remote service. This demonstrates the
@@ -34,7 +34,8 @@ public class ClientActivity extends Activity {
   private TextView mResponseTextView;
   private boolean mIsBound;
 
-  private int mValue = 0;
+  private int mRequestCounter = 0;
+  private int mResponseCounter = 0;
 
   /**
    * Standard initialization of this activity. Set up the UI, then wait for the
@@ -86,9 +87,12 @@ public class ClientActivity extends Activity {
         if (mIsBound) {
           if (mService != null) {
             try {
-              Request request = new Request("unix11.andrew.cmu.edu", 18001, "asdf".getBytes());
-              Log.i(TAG, "Client sending request: " + request.toString());
-              mService.send(request);
+              for (int i=0; i<5; i++) {
+                mRequestCounter++;
+                Request request = new Request("", -1, ("Request #" + mRequestCounter).getBytes());
+                Log.i(TAG, "Client sending request: " + request.toString());
+                mService.send(request, i * 1000);
+              }
             } catch (RemoteException ignore) {
               // The service has crashed.
             }
@@ -101,7 +105,7 @@ public class ClientActivity extends Activity {
     mTextView.setText("Not attached.");
 
     mResponseTextView = (TextView) findViewById(R.id.response);
-    mResponseTextView.setText("No response yet.");
+    //mResponseTextView.setText("No response yet.");
   }
 
   @Override
@@ -153,7 +157,6 @@ public class ClientActivity extends Activity {
    * Rceives callbacks from the remote service.
    */
   private final INetworkServiceCallback mCallback = new INetworkServiceCallback.Stub() {
-
     /**
      * Called by the remote service on a background thread.
      */
@@ -163,8 +166,8 @@ public class ClientActivity extends Activity {
       runOnUiThread(new Runnable() {
         @Override
         public void run() {
-          mValue++;
-          mResponseTextView.setText("Received " + mValue + " responses.");
+          mResponseCounter++;
+          mResponseTextView.append(mResponseCounter + ". " + response.toString() + "\n");
         }
       });
     }

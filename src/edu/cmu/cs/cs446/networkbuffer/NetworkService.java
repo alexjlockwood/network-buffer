@@ -1,7 +1,5 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
-import java.util.concurrent.DelayQueue;
-
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -16,7 +14,6 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Log;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.networkbuffer.RequestExecutor.DelayedRequest;
 import edu.cmu.cs.cs446.networkbuffer.RequestExecutor.RequestCallback;
 import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
 
@@ -33,15 +30,13 @@ public class NetworkService extends Service implements RequestCallback {
   private static final int RESPOND_TO_CLIENT = 0;
   private RemoteCallbackList<INetworkServiceCallback> mCallbacks;
   private NotificationManager mNotificationManager;
-  private DelayQueue<DelayedRequest> mDelayQueue;
   private RequestExecutor mThread;
 
   @Override
   public void onCreate() {
     mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     mCallbacks = new RemoteCallbackList<INetworkServiceCallback>();
-    mDelayQueue = new DelayQueue<DelayedRequest>();
-    mThread = new RequestExecutor(mDelayQueue, this);
+    mThread = new RequestExecutor(this);
     mThread.start();
     showNotification();
   }
@@ -81,18 +76,23 @@ public class NetworkService extends Service implements RequestCallback {
     }
 
     @Override
-    public void send(Request request) {
+    public void send(Request request, long delay) {
       Log.i(TAG, "Service received request: " + request.toString());
       // Queue up 10 dummy requests in rapid succession
-      for (int i=0; i<10; i++) {
-        mDelayQueue.put(new DelayedRequest(request));
-      }
+        mThread.put(new DelayedRequest(request, delay));
     }
   };
 
   @Override
   public void onRequestComplete(Response response) {
     Log.i(TAG, "Dispatching response to client: " + response.toString());
+    mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
+  }
+
+  @Override
+  public void onException(Exception exception) {
+    Log.i(TAG, "Notifying client that an exception occurred!");
+    Response response = new Response("An exception occurred while processing the request!".getBytes());
     mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
   }
 
@@ -131,13 +131,9 @@ public class NetworkService extends Service implements RequestCallback {
     Bitmap largeIcon = BitmapFactory.decodeResource(getResources(), R.drawable.device_access_network_wifi);
 
     @SuppressWarnings("deprecation")
-    Notification notification = new Notification.Builder(this)
-        .setSmallIcon(R.drawable.device_access_network_wifi)
-        .setLargeIcon(largeIcon)
-        .setContentTitle(getText(R.string.remote_service_label))
-        .setContentText(getText(R.string.remote_service_started))
-        .setWhen(System.currentTimeMillis())
-        .getNotification();
+    Notification notification = new Notification.Builder(this).setSmallIcon(R.drawable.device_access_network_wifi)
+        .setLargeIcon(largeIcon).setContentTitle(getText(R.string.remote_service_label))
+        .setContentText(getText(R.string.remote_service_started)).setWhen(System.currentTimeMillis()).getNotification();
 
     // Send the notification. We use a string id because it is a unique number.
     // We use it later to cancel.

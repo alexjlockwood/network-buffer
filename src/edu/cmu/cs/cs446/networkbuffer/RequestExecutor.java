@@ -1,46 +1,69 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
+import java.util.PriorityQueue;
 import java.util.concurrent.DelayQueue;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import android.util.Log;
 
 class RequestExecutor extends Thread {
   private static final String TAG = RequestExecutor.class.getSimpleName();
 
-  private RequestCallback mCallback;
-  private DelayQueue<DelayedRequest> mDelayQueue;
+  private static final ExecutorService mExecutor = Executors.newSingleThreadExecutor();
+  private final PriorityQueue<DelayedRequest> mRequests;
+  private final DelayQueue<DelayedRequest> mDelayQueue;
+  private final RequestCallback mCallback;
   private boolean mRunning;
 
-  public RequestExecutor(DelayQueue<DelayedRequest> delayQueue, RequestCallback callback) {
-    mDelayQueue = delayQueue;
-    mRunning = false;
+  public RequestExecutor(RequestCallback callback) {
+    mRequests = new PriorityQueue<DelayedRequest>();
+    mDelayQueue = new DelayQueue<DelayedRequest>();
     mCallback = callback;
+    mRunning = false;
   }
 
   @Override
   public void run() {
     Log.i(TAG, "Background daemon running... ");
     mRunning = true;
+
     while (mRunning) {
       try {
-        Log.i(TAG, "Background daemon waiting for next delayed request... ");
-        DelayedRequest delayed = mDelayQueue.take();
-        Request request = delayed.getRequest();
-        Log.i(TAG, "Background daemon found new delayed request: " + request.toString());
-        Response response = null;
-        try {
-          response = request.call();
-        } catch (Exception e) {
-          e.printStackTrace();
+        Log.i(TAG, "Background daemon waiting for delayed request... ");
+        mDelayQueue.take();
+        synchronized (mDelayQueue) {
+          Log.i(TAG, "Executing requests in batch...");
+          for (final DelayedRequest request : mRequests) {
+            mExecutor.execute(new Runnable() {
+              @Override
+              public void run() {
+                Log.i(TAG, "Background daemon executing request on Executor: " + request.toString());
+                Response response;
+                try {
+                  response = request.call();
+                  Log.i(TAG, "Background daemon executed request and received response: " + response.toString());
+                  mCallback.onRequestComplete(response);
+                } catch (Exception e) {
+                  mCallback.onException(e);
+                }
+              }
+            });
+          }
+          mDelayQueue.clear();
+          mRequests.clear();
         }
-        Log.i(TAG, "Background daemon executed request and received response: " + response.toString());
-        mCallback.onRequestComplete(response);
       } catch (InterruptedException e) {
         Log.e(TAG, "Thread interuptted while waiting for delayed request!");
         mRunning = false;
       }
+    }
+  }
+
+  public void put(DelayedRequest request) {
+    synchronized (mDelayQueue) {
+      mDelayQueue.put(request);
+      mRequests.add(request);
     }
   }
 
@@ -61,50 +84,10 @@ class RequestExecutor extends Thread {
      * delivering the response to the client.
      */
     void onRequestComplete(Response response);
+
+    /**
+     * Report to the client that the request resulted in an Exception.
+     */
+    void onException(Exception exception);
   }
-
-  /**
-   * Wrapper class around Request for use in the DelayQueue.
-   */
-  static class DelayedRequest implements Delayed {
-    private final long mOrigin;
-    private final long mDelay;
-    private final Request mRequest;
-
-    public DelayedRequest(Request request) {
-      mOrigin = System.currentTimeMillis();
-      mDelay = 5000 - (mOrigin % 5000);
-      mRequest = request;
-    }
-
-    public Request getRequest() {
-      return mRequest;
-    }
-
-    @Override
-    public long getDelay(TimeUnit unit) {
-      return unit.convert(mDelay - (System.currentTimeMillis() - mOrigin), TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    public int compareTo(Delayed delayed) {
-      if (this == delayed)
-        return 0;
-
-      long diff;
-      if (delayed instanceof DelayedRequest) {
-        diff = mDelay - ((DelayedRequest) delayed).mDelay;
-      } else {
-        diff = getDelay(TimeUnit.MILLISECONDS) - delayed.getDelay(TimeUnit.MILLISECONDS);
-      }
-
-      if (diff > 0)
-        return 1;
-      if (diff < 0)
-        return -1;
-      return 0;
-    }
-
-  }
-
 }

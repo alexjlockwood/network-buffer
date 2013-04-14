@@ -8,10 +8,6 @@ import android.os.Parcelable;
 
 public class Request implements Parcelable, Callable<Response> {
 
-  public static final int PRIORITY_LOW = 0;
-  public static final int PRIORITY_HIGH = 1;
-  public static final int PRIORITY_IMMEDIETE = 2;
-
   private String mDstName;
   private int mDstPort;
   private byte[] mPayload;
@@ -32,6 +28,11 @@ public class Request implements Parcelable, Callable<Response> {
 
   public byte[] getPayload() {
     return mPayload;
+  }
+
+  @Override
+  public Response call() throws Exception {
+    return new Response(mPayload);
   }
 
   public Request(Parcel in) {
@@ -71,11 +72,6 @@ public class Request implements Parcelable, Callable<Response> {
   };
 
   @Override
-  public String toString() {
-    return "[dstName=" + mDstName + ", dstPort=" + mDstPort + ", payload=" + new String(mPayload) + "]";
-  }
-
-  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -94,7 +90,7 @@ public class Request implements Parcelable, Callable<Response> {
   }
 
   @Override
-  public Response call() throws Exception {
-    return new Response(mPayload);
+  public String toString() {
+    return "[dstName=" + mDstName + ", dstPort=" + mDstPort + ", payload=" + new String(mPayload) + "]";
   }
 }
