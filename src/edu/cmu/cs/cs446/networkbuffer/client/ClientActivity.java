@@ -37,6 +37,12 @@ public class ClientActivity extends Activity {
   private int mRequestCounter = 0;
   private int mResponseCounter = 0;
 
+  // Run the server for the entirety of the client application's lifetime.
+  private static final TestServer mServer = new TestServer();
+  static {
+    mServer.start();
+  }
+
   /**
    * Standard initialization of this activity. Set up the UI, then wait for the
    * user to poke it before doing anything.
@@ -87,7 +93,7 @@ public class ClientActivity extends Activity {
         if (mIsBound) {
           if (mService != null) {
             try {
-              for (int i=0; i<5; i++) {
+              for (int i = 0; i < 5; i++) {
                 mRequestCounter++;
                 Request request = new Request("", -1, ("Request #" + mRequestCounter).getBytes());
                 Log.i(TAG, "Client sending request: " + request.toString());
@@ -105,7 +111,6 @@ public class ClientActivity extends Activity {
     mTextView.setText("Not attached.");
 
     mResponseTextView = (TextView) findViewById(R.id.response);
-    //mResponseTextView.setText("No response yet.");
   }
 
   @Override
