@@ -78,8 +78,7 @@ public class NetworkService extends Service implements RequestCallback {
     @Override
     public void send(Request request, long delay) {
       Log.i(TAG, "Service received request: " + request.toString());
-      // Queue up 10 dummy requests in rapid succession
-        mThread.put(new DelayedRequest(request, delay));
+      mThread.put(new DelayedRequest(request, delay));
     }
   };
 

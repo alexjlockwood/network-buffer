@@ -13,13 +13,14 @@ import android.util.Log;
 
 public class TestServer extends Thread {
   private static final String TAG = TestServer.class.getSimpleName();
-  private static final int DEFAULT_POOL_SIZE = 20;
+  private static final int DEFAULT_POOL_SIZE = 16;
   private static final int DEFAULT_PORT = 4444;
 
   private final int port;
   private final ExecutorService pool;
 
   private ServerSocket mServerSocket = null;
+  private boolean mRunning = false;
 
   public TestServer() {
     this(DEFAULT_PORT, DEFAULT_POOL_SIZE);
@@ -45,15 +46,15 @@ public class TestServer extends Thread {
 
     Log.i(TAG, "Server waiting for incoming connections...");
 
-    while (true) {
+    mRunning = true;
+    while (mRunning) {
       try {
-        // Wait for an incoming client connection
-        Socket newClient = mServerSocket.accept();
+        Socket clientSocket = mServerSocket.accept();
         Log.i(TAG, "Server received incoming connection!");
-        // Execute the client's job on a background thread
-        pool.execute(new RequestHandler(newClient));
+        pool.execute(new RequestHandler(clientSocket));
       } catch (IOException e) {
         Log.e(TAG, "Server received IOException while listening for clients...");
+        mRunning = false;
         break;
       }
     }
@@ -65,11 +66,13 @@ public class TestServer extends Thread {
         mServerSocket.close();
         mServerSocket = null;
       }
-    } catch (IOException ignore) {
+    } catch (IOException e) {
+      Log.e(TAG, "Failed to close server socket.");
     }
   }
 
   public synchronized void close() {
+    mRunning = false;
     try {
       if (mServerSocket != null) {
         mServerSocket.close();
@@ -97,13 +100,12 @@ public class TestServer extends Thread {
         bufferedReader = new BufferedReader(inputStreamReader);
         String text = bufferedReader.readLine();
         printWriter = new PrintWriter(socket.getOutputStream(), true);
-        printWriter.write(text);
+        printWriter.write("Echo: " + text);
       } catch (IOException e) {
         Log.e(TAG, "Error reading/writing to stream.");
         return;
       }
 
-      // close stuff
       try {
         if (printWriter != null) {
           printWriter.close();

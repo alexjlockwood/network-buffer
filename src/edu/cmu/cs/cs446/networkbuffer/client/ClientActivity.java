@@ -93,9 +93,25 @@ public class ClientActivity extends Activity {
         if (mIsBound) {
           if (mService != null) {
             try {
-              for (int i = 0; i < 5; i++) {
+              // for (int i = 0; i < 5; i++) {
+              // mRequestCounter++;
+              // Request request = new Request("localhost", 4444, ("Request #" +
+              // mRequestCounter).getBytes());
+              // Log.i(TAG, "Client sending request: " + request.toString());
+              // mService.send(request, 0);
+              // }
+
+              // for (int i = 0; i < 5; i++) {
+              // mRequestCounter++;
+              // Request request = new Request("localhost", 4444, ("Request #" +
+              // mRequestCounter).getBytes());
+              // Log.i(TAG, "Client sending request: " + request.toString());
+              // mService.send(request, 5000);
+              // }
+
+              for (int i = 5; i >= 1; i--) {
                 mRequestCounter++;
-                Request request = new Request("", -1, ("Request #" + mRequestCounter).getBytes());
+                Request request = new Request("localhost", 4444, ("Request #" + mRequestCounter).getBytes());
                 Log.i(TAG, "Client sending request: " + request.toString());
                 mService.send(request, i * 1000);
               }
