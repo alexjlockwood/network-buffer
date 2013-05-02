@@ -16,8 +16,8 @@ public class TestServer extends Thread {
   private static final int DEFAULT_POOL_SIZE = 16;
   private static final int DEFAULT_PORT = 4444;
 
-  private final int port;
-  private final ExecutorService pool;
+  private final int mPort;
+  private final ExecutorService mPool;
 
   private ServerSocket mServerSocket = null;
   private boolean mRunning = false;
@@ -31,16 +31,16 @@ public class TestServer extends Thread {
   }
 
   public TestServer(int port, int poolSize) {
-    this.port = port;
-    this.pool = Executors.newFixedThreadPool(poolSize);
+    this.mPort = port;
+    this.mPool = Executors.newFixedThreadPool(poolSize);
   }
 
   @Override
   public void run() {
     try {
-      mServerSocket = new ServerSocket(port);
+      mServerSocket = new ServerSocket(mPort);
     } catch (IOException e) {
-      Log.e(TAG, "Could not open server socket on port: " + port);
+      Log.e(TAG, "Could not open server socket on port: " + mPort);
       return;
     }
 
@@ -51,7 +51,7 @@ public class TestServer extends Thread {
       try {
         Socket clientSocket = mServerSocket.accept();
         Log.i(TAG, "Server received incoming connection!");
-        pool.execute(new RequestHandler(clientSocket));
+        mPool.execute(new RequestHandler(clientSocket));
       } catch (IOException e) {
         Log.e(TAG, "Server received IOException while listening for clients...");
         mRunning = false;
@@ -118,5 +118,9 @@ public class TestServer extends Thread {
         Log.e(TAG, "Error closing sockets and streams.");
       }
     }
+  }
+
+  public static void main(String[] args) {
+    new TestServer().run();
   }
 }

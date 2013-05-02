@@ -1,5 +1,8 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -14,7 +17,6 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Log;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.networkbuffer.RequestExecutor.RequestCallback;
 import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
 
 /**
@@ -24,19 +26,21 @@ import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
  * how to interact with the service.
  */
 @SuppressLint("HandlerLeak")
-public class NetworkService extends Service implements RequestCallback {
+public class NetworkService extends Service /*implements RequestCallback*/ {
   private static final String TAG = NetworkService.class.getSimpleName();
-
   private static final int RESPOND_TO_CLIENT = 0;
+
   private RemoteCallbackList<INetworkServiceCallback> mCallbacks;
   private NotificationManager mNotificationManager;
-  private RequestExecutor mThread;
+  private Map<String, DelaySocket> mDelaySockets;
+  private DelaySocketExecutor mThread;
 
   @Override
   public void onCreate() {
     mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     mCallbacks = new RemoteCallbackList<INetworkServiceCallback>();
-    mThread = new RequestExecutor(this);
+    mDelaySockets = new HashMap<String, DelaySocket>();
+    mThread = new DelaySocketExecutor();
     mThread.start();
     showNotification();
   }
@@ -78,11 +82,18 @@ public class NetworkService extends Service implements RequestCallback {
     @Override
     public void send(Request request, long delay) {
       Log.i(TAG, "Service received request: " + request.toString());
-      mThread.put(new DelayedRequest(request, delay));
+      String host = request.getHost();
+      int port = Integer.valueOf(request.getPort());
+      DelaySocket delaySocket = mDelaySockets.get(host + ":" + port);
+      if (delaySocket == null) {
+        delaySocket = new DelaySocket(host, port);
+      }
+      delaySocket.add(request, delay);
+      mThread.add(delaySocket);
     }
   };
 
-  @Override
+  /*@Override
   public void onRequestComplete(Response response) {
     Log.i(TAG, "Dispatching response to client: " + response.toString());
     mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
@@ -93,7 +104,7 @@ public class NetworkService extends Service implements RequestCallback {
     Log.i(TAG, "Notifying client that an exception occurred!");
     Response response = new Response("An exception occurred while processing the request!".getBytes());
     mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
-  }
+  }*/
 
   /**
    * Our Handler used to execute operations on the main thread. This is used to
