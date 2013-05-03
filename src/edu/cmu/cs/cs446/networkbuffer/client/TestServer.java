@@ -44,7 +44,7 @@ public class TestServer extends Thread {
       return;
     }
 
-    Log.i(TAG, "Server waiting for incoming connections...");
+    Log.i(TAG, "Test server waiting for incoming connections...");
 
     mRunning = true;
     while (mRunning) {
@@ -96,14 +96,17 @@ public class TestServer extends Thread {
       BufferedReader bufferedReader = null;
       PrintWriter printWriter = null;
       try {
-        inputStreamReader = new InputStreamReader(socket.getInputStream());
-        bufferedReader = new BufferedReader(inputStreamReader);
-        String text = bufferedReader.readLine();
-        printWriter = new PrintWriter(socket.getOutputStream(), true);
-        printWriter.write("Echo: " + text);
+        while (true) {
+          inputStreamReader = new InputStreamReader(socket.getInputStream());
+          bufferedReader = new BufferedReader(inputStreamReader);
+          String text = bufferedReader.readLine();
+          Log.i(TAG, "Received text: " + text);
+          printWriter = new PrintWriter(socket.getOutputStream(), true);
+          Log.i(TAG, "Writing text: " + text);
+          printWriter.println(text);
+        }
       } catch (IOException e) {
         Log.e(TAG, "Error reading/writing to stream.");
-        return;
       }
 
       try {
@@ -118,9 +121,5 @@ public class TestServer extends Thread {
         Log.e(TAG, "Error closing sockets and streams.");
       }
     }
-  }
-
-  public static void main(String[] args) {
-    new TestServer().run();
   }
 }

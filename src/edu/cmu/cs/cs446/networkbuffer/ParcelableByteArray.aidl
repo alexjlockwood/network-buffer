@@ -1,3 +1,3 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
-parcelable Request;
+parcelable ParcelableByteArray;

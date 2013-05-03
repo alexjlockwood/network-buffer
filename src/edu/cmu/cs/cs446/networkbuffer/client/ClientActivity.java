@@ -16,9 +16,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import edu.cmu.cs.cs446.networkbuffer.INetworkService;
 import edu.cmu.cs.cs446.networkbuffer.INetworkServiceCallback;
+import edu.cmu.cs.cs446.networkbuffer.ParcelableByteArray;
 import edu.cmu.cs.cs446.networkbuffer.R;
-import edu.cmu.cs.cs446.networkbuffer.Request;
-import edu.cmu.cs.cs446.networkbuffer.Response;
 
 /**
  * Example of binding and unbinding to the remote service. This demonstrates the
@@ -28,20 +27,22 @@ import edu.cmu.cs.cs446.networkbuffer.Response;
 public class ClientActivity extends Activity {
   private static final String TAG = ClientActivity.class.getSimpleName();
 
-  /** The primary interface we will be calling on the service. */
-  private INetworkService mService = null;
-  private TextView mTextView;
-  private TextView mResponseTextView;
-  private boolean mIsBound;
-
-  private int mRequestCounter = 0;
-  private int mResponseCounter = 0;
-
-  // Run the server for the entirety of the client application's lifetime.
-  private static final TestServer mServer = new TestServer();
+  // For debugging purposes only.
+  private static final int DEFAULT_PORT = 4444;
+  private static final TestServer mServer = new TestServer(DEFAULT_PORT);
   static {
     mServer.start();
   }
+
+  // The primary interface we will be calling on the service.
+  private INetworkService mService;
+  private TextView mTextView;
+  private TextView mResponseTextView;
+  private boolean mIsBound;
+  private long mHandle = -1L;
+
+  private int mRequestCounter = 0;
+  private int mResponseCounter = 0;
 
   /**
    * Standard initialization of this activity. Set up the UI, then wait for the
@@ -51,6 +52,10 @@ public class ClientActivity extends Activity {
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
+
+    if (savedInstanceState != null) {
+      mHandle = savedInstanceState.getLong("handle");
+    }
 
     Button bindButton = (Button) findViewById(R.id.bind);
     bindButton.setOnClickListener(new OnClickListener() {
@@ -63,7 +68,7 @@ public class ClientActivity extends Activity {
         Intent intent = new Intent(INetworkService.class.getName());
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
         mIsBound = true;
-        mTextView.setText("Binding.");
+        mTextView.setText("Binding...");
       }
     });
 
@@ -93,27 +98,11 @@ public class ClientActivity extends Activity {
         if (mIsBound) {
           if (mService != null) {
             try {
-              // for (int i = 0; i < 5; i++) {
-              // mRequestCounter++;
-              // Request request = new Request("localhost", 4444, ("Request #" +
-              // mRequestCounter).getBytes());
-              // Log.i(TAG, "Client sending request: " + request.toString());
-              // mService.send(request, 0);
-              // }
-
-              // for (int i = 0; i < 5; i++) {
-              // mRequestCounter++;
-              // Request request = new Request("localhost", 4444, ("Request #" +
-              // mRequestCounter).getBytes());
-              // Log.i(TAG, "Client sending request: " + request.toString());
-              // mService.send(request, 5000);
-              // }
-
               for (int i = 5; i >= 1; i--) {
                 mRequestCounter++;
-                Request request = new Request("localhost", 4444, ("Request #" + mRequestCounter).getBytes());
+                ParcelableByteArray request = new ParcelableByteArray(("Request #" + mRequestCounter).getBytes());
                 Log.i(TAG, "Client sending request: " + request.toString());
-                mService.send(request, i * 1000);
+                mService.send(mHandle, request, i * 1000);
               }
             } catch (RemoteException ignore) {
               // The service has crashed.
@@ -127,6 +116,12 @@ public class ClientActivity extends Activity {
     mTextView.setText("Not attached.");
 
     mResponseTextView = (TextView) findViewById(R.id.response);
+  }
+
+  @Override
+  protected void onSaveInstanceState(Bundle savedInstanceState) {
+    super.onSaveInstanceState(savedInstanceState);
+    savedInstanceState.putLong("handle", mHandle);
   }
 
   @Override
@@ -150,17 +145,20 @@ public class ClientActivity extends Activity {
       // service through an IDL interface, so get a client-side
       // representation of that from the raw service object.
       mService = INetworkService.Stub.asInterface(service);
-      mTextView.setText("Attached.");
 
-      // Monitor the service for as long as we are connected to it.
       try {
+        // Monitor the service for as long as we are connected to it.
         mService.registerCallback(mCallback);
+        // Request a handle to use for future requests to the service
+        mHandle = mService.open("localhost", 4444);
       } catch (RemoteException ignore) {
         // In this case the service has crashed before we could even
         // do anything with it; we can count on soon being
         // disconnected (and then reconnected if it can be restarted)
         // so there is no need to do anything here.
       }
+
+      mTextView.setText("Attached (" + mHandle + ")");
       Toast.makeText(ClientActivity.this, R.string.remote_service_connected, Toast.LENGTH_SHORT).show();
     }
 
@@ -169,6 +167,7 @@ public class ClientActivity extends Activity {
       // This is called when the connection with the service has been
       // unexpectedly disconnected -- that is, its process crashed.
       mService = null;
+      mHandle = -1L;
       mTextView.setText("Disconnected.");
       Toast.makeText(ClientActivity.this, R.string.remote_service_disconnected, Toast.LENGTH_SHORT).show();
     }
@@ -182,7 +181,7 @@ public class ClientActivity extends Activity {
      * Called by the remote service on a background thread.
      */
     @Override
-    public void receive(final Response response) {
+    public void onReceive(final ParcelableByteArray response) {
       Log.i(TAG, "Received " + response.toString());
       runOnUiThread(new Runnable() {
         @Override

@@ -1,15 +1,16 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
-import edu.cmu.cs.cs446.networkbuffer.Response;
+import edu.cmu.cs.cs446.networkbuffer.ParcelableByteArray;
 
 /**
  * Example of a callback interface used by INetworkService to send
- * synchronous notifications back to its clients.  Note that this is a
+ * synchronous notifications back to its clients. Note that this is a
  * one-way interface so the server does not block waiting for the client.
  */
 oneway interface INetworkServiceCallback {
+
     /**
      * Called when the service has a new value for you.
      */
-    void receive(in Response response);
+    void onReceive(in ParcelableByteArray response);
 }
