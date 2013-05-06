@@ -12,23 +12,49 @@
         android:orientation="vertical"
         android:padding="4dp" >
 
-        <Button
-            android:id="@+id/bind"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/bind_service" />
+            android:orientation="horizontal"
+            android:padding="4dp" >
 
-        <Button
-            android:id="@+id/unbind"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/unbind_service" />
+            <Button
+                android:id="@+id/bind"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bind" />
 
-        <Button
-            android:id="@+id/request"
+            <Button
+                android:id="@+id/unbind"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Unbind" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/network_request" />
+            android:orientation="horizontal"
+            android:padding="4dp" >
+
+            <Button
+                android:id="@+id/test1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Test Send (5)" />
+
+            <Button
+                android:id="@+id/test2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Test Send (3-3-3)" />
+
+            <Button
+                android:id="@+id/test3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Test Close" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/callback"

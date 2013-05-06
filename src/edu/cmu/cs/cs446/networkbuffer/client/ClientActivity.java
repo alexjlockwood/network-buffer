@@ -1,11 +1,15 @@
 package edu.cmu.cs.cs446.networkbuffer.client;
 
+import java.text.DateFormat;
+import java.util.Date;
+
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
@@ -28,8 +32,7 @@ public class ClientActivity extends Activity {
   private static final String TAG = ClientActivity.class.getSimpleName();
 
   // For debugging purposes only.
-  private static final int DEFAULT_PORT = 4444;
-  private static final TestServer mServer = new TestServer(DEFAULT_PORT);
+  private static final TestServer mServer = new TestServer();
   static {
     mServer.start();
   }
@@ -41,7 +44,6 @@ public class ClientActivity extends Activity {
   private boolean mIsBound;
   private long mHandle = -1L;
 
-  private int mRequestCounter = 0;
   private int mResponseCounter = 0;
 
   /**
@@ -91,23 +93,32 @@ public class ClientActivity extends Activity {
       }
     });
 
-    Button requestButton = (Button) findViewById(R.id.request);
-    requestButton.setOnClickListener(new OnClickListener() {
+    Button test1 = (Button) findViewById(R.id.test1);
+    test1.setOnClickListener(new OnClickListener() {
       @Override
       public void onClick(View v) {
         if (mIsBound) {
-          if (mService != null) {
-            try {
-              for (int i = 5; i >= 1; i--) {
-                mRequestCounter++;
-                ParcelableByteArray request = new ParcelableByteArray(("Request #" + mRequestCounter).getBytes());
-                Log.i(TAG, "Client sending request: " + request.toString());
-                mService.send(mHandle, request, i * 1000);
-              }
-            } catch (RemoteException ignore) {
-              // The service has crashed.
-            }
-          }
+          testSingleBatchRequest();
+        }
+      }
+    });
+
+    Button test2 = (Button) findViewById(R.id.test2);
+    test2.setOnClickListener(new OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        if (mIsBound) {
+          testMultipleDelayedBatchRequests();
+        }
+      }
+    });
+
+    Button test3 = (Button) findViewById(R.id.test3);
+    test3.setOnClickListener(new OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        if (mIsBound) {
+          testShutdown();
         }
       }
     });
@@ -158,7 +169,7 @@ public class ClientActivity extends Activity {
         // so there is no need to do anything here.
       }
 
-      mTextView.setText("Attached (" + mHandle + ")");
+      mTextView.setText("Attached (Handle: " + mHandle + ")");
       Toast.makeText(ClientActivity.this, R.string.remote_service_connected, Toast.LENGTH_SHORT).show();
     }
 
@@ -192,4 +203,67 @@ public class ClientActivity extends Activity {
       });
     }
   };
+
+  private void testSingleBatchRequest() {
+    final DateFormat df = DateFormat.getTimeInstance();
+    mResponseTextView.setText("Running test #1 (" + df.format(new Date()) + ")\n\n");
+    try {
+      mService.send(mHandle, new ParcelableByteArray("Request #1".getBytes()), 6000);
+      mService.send(mHandle, new ParcelableByteArray("Request #2".getBytes()), 5000);
+      mService.send(mHandle, new ParcelableByteArray("Request #3".getBytes()), 4000);
+      mService.send(mHandle, new ParcelableByteArray("Request #4".getBytes()), 3000);
+      mService.send(mHandle, new ParcelableByteArray("Request #5".getBytes()), 2000);
+    } catch (RemoteException ignore) { }
+  }
+
+  private void testMultipleDelayedBatchRequests() {
+    final DateFormat df = DateFormat.getTimeInstance();
+    mResponseTextView.setText("Running test #2 (" + df.format(new Date()) + ")\n\n");
+
+    try {
+      mService.send(mHandle, new ParcelableByteArray("Request #1".getBytes()), 500);
+      mService.send(mHandle, new ParcelableByteArray("Request #2".getBytes()), 1000);
+      mService.send(mHandle, new ParcelableByteArray("Request #3".getBytes()), 1500);
+    } catch (RemoteException ignore) { }
+
+    new Handler().postDelayed(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          mService.send(mHandle, new ParcelableByteArray("Request #4".getBytes()), 500);
+          mService.send(mHandle, new ParcelableByteArray("Request #5".getBytes()), 1000);
+          mService.send(mHandle, new ParcelableByteArray("Request #6".getBytes()), 1500);
+        } catch (RemoteException ignore) { }
+      }
+    }, 1500);
+
+    new Handler().postDelayed(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          mService.send(mHandle, new ParcelableByteArray("Request #7".getBytes()), 500);
+          mService.send(mHandle, new ParcelableByteArray("Request #8".getBytes()), 1000);
+          mService.send(mHandle, new ParcelableByteArray("Request #9".getBytes()), 1500);
+        } catch (RemoteException ignore) { }
+      }
+    }, 3500);
+  }
+
+  private void testShutdown() {
+    final DateFormat df = DateFormat.getTimeInstance();
+    mResponseTextView.setText("Running test #3 (" + df.format(new Date()) + ")\n\n");
+    try {
+      mService.send(mHandle, new ParcelableByteArray("Request #1".getBytes()), 0);
+      mService.send(mHandle, new ParcelableByteArray("Request #2".getBytes()), 1000);
+      mService.send(mHandle, new ParcelableByteArray("Request #3".getBytes()), 1000);
+      mService.send(mHandle, new ParcelableByteArray("Request #4".getBytes()), 1000);
+      mService.send(mHandle, new ParcelableByteArray("Request #5".getBytes()), 1000);
+      mService.shutdown(mHandle);
+      mService.send(mHandle, new ParcelableByteArray("Request #6".getBytes()), 0);
+      mService.send(mHandle, new ParcelableByteArray("Request #7".getBytes()), 0);
+      mService.send(mHandle, new ParcelableByteArray("Request #8".getBytes()), 0);
+      mService.send(mHandle, new ParcelableByteArray("Request #9".getBytes()), 0);
+      mService.send(mHandle, new ParcelableByteArray("Request #10".getBytes()), 0);
+    } catch (RemoteException ignore) { }
+  }
 }

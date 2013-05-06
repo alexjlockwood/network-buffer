@@ -32,7 +32,9 @@ interface INetworkService {
 	void send(long handle, in ParcelableByteArray request, long delay);
 	
 	/**
-     * Close the delay socket with the given handle id.
+     * Close the delay socket with the given handle id. No new requests
+     * will be accepted after this call (although any pending requests
+     * will still wait to be executed at a later time).
      */
-    void close(long handle);
+    void shutdown(long handle);
 }

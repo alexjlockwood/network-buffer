@@ -1,8 +1,10 @@
 package edu.cmu.cs.cs446.networkbuffer;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import android.annotation.SuppressLint;
 import android.app.Notification;
@@ -18,7 +20,6 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Log;
 import android.widget.Toast;
-import edu.cmu.cs.cs446.networkbuffer.DelaySocketExecutor.ResponseCallback;
 import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
 
 /**
@@ -26,33 +27,54 @@ import edu.cmu.cs.cs446.networkbuffer.client.ClientActivity;
  * different process than the application. Because it can be in another process,
  * we must use IPC to interact with it. The {@link ClientActivity} class shows
  * how to interact with the service.
+ *
+ * Note that this class relies on the fact that we schedule tasks to be executed
+ * sequentially on a single background thread. A more intelligent implementation
+ * would allow for the execution of many requests to many remote hosts
+ * simultaneously.
  */
 @SuppressLint("HandlerLeak")
 public class NetworkService extends Service implements ResponseCallback {
   private static final String TAG = NetworkService.class.getSimpleName();
 
+  private ScheduledExecutorService mScheduledExecutor;
   private RemoteCallbackList<INetworkServiceCallback> mCallbacks;
   private NotificationManager mNotificationManager;
-  private Map<Long, DelaySocket> mDelaySockets;
-  private DelaySocketExecutor mExecutorThread;
+  private ConcurrentHashMap<Long, DelaySocket> mDelaySockets;
 
   @Override
   public void onCreate() {
-    mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+    // TODO: make this multi-threaded... someday.
+    mScheduledExecutor = Executors.newScheduledThreadPool(1);
+
+    // Start a periodic garbage collection task to check for and cleanup any
+    // terminated delay sockets.
+    mScheduledExecutor.scheduleAtFixedRate(new Runnable() {
+      @Override
+      public void run() {
+        for (Long handle : mDelaySockets.keySet()) {
+          DelaySocket delaySocket = mDelaySockets.get(handle);
+          if (delaySocket != null && delaySocket.isTerminated()) {
+            delaySocket.close();
+            mDelaySockets.remove(handle);
+          }
+        }
+      }
+    }, 0, 4000, TimeUnit.MILLISECONDS);
+
     mCallbacks = new RemoteCallbackList<INetworkServiceCallback>();
-    mDelaySockets = new HashMap<Long, DelaySocket>();
-    mExecutorThread = new DelaySocketExecutor();
-    mExecutorThread.start();
+    mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+    mDelaySockets = new ConcurrentHashMap<Long, DelaySocket>();
     showNotification();
   }
 
   @Override
   public void onDestroy() {
     Toast.makeText(this, R.string.remote_service_stopped, Toast.LENGTH_SHORT).show();
-    mNotificationManager.cancel(R.string.remote_service_started);
+    mScheduledExecutor.shutdown();
     mCallbacks.kill();
+    mNotificationManager.cancel(R.string.remote_service_started);
     mHandler.removeMessages(RESPOND_TO_CLIENT);
-    mExecutorThread.close();
   }
 
   @Override
@@ -65,10 +87,6 @@ public class NetworkService extends Service implements ResponseCallback {
     Toast.makeText(this, "Task removed: " + rootIntent, Toast.LENGTH_LONG).show();
   }
 
-  /**
-   * We may assume that all of these methods will be called on the client
-   * application's main UI thread.
-   */
   private final INetworkService.Stub mBinder = new INetworkService.Stub() {
 
     // TODO: figure out a more reliable way of guaranteeing uniqueness.
@@ -92,29 +110,26 @@ public class NetworkService extends Service implements ResponseCallback {
 
     @Override
     public long open(String host, int port) {
-      Log.i(TAG, "Service received open request!");
-      long handle = random.nextLong();
+      Log.i(TAG, "open(String, int)");
       DelaySocket delaySocket = new DelaySocket(host, port, NetworkService.this);
+      long handle = random.nextLong();
       mDelaySockets.put(handle, delaySocket);
-      // mExecutorThread.add(delaySocket);
       return handle;
     }
 
     @Override
     public void send(long handle, ParcelableByteArray request, long delay) {
-      // Log.i(TAG, "Service received send request!");
+      Log.i(TAG, "send(long, ParcelableByteArray, long)");
       DelaySocket delaySocket = mDelaySockets.get(handle);
-      synchronized (delaySocket) {
-        delaySocket.add(request, delay);
-        mExecutorThread.replace(delaySocket);
+      if (delaySocket != null) {
+        delaySocket.add(mScheduledExecutor, request, delay);
       }
     }
 
     @Override
-    public void close(long handle) {
-      Log.i(TAG, "Service received close request!");
-      DelaySocket delaySocket = mDelaySockets.get(handle);
-      delaySocket.close();
+    public void shutdown(long handle) {
+      Log.i(TAG, "shutdown(long)");
+      mDelaySockets.get(handle).shutdown();
     }
   };
 
@@ -124,14 +139,25 @@ public class NetworkService extends Service implements ResponseCallback {
     mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT, response));
   }
 
-  // @Override
-  // public void onException(Exception exception) {
-  // Log.i(TAG, "Notifying client that an exception occurred!");
-  // Response response = new
-  // Response("An exception occurred while processing the request!".getBytes());
-  // mHandler.dispatchMessage(mHandler.obtainMessage(RESPOND_TO_CLIENT,
-  // response));
-  // }
+  /**
+   * Show a notification while this service is running.
+   */
+  private void showNotification() {
+    Bitmap largeIcon = BitmapFactory.decodeResource(getResources(), R.drawable.device_access_network_wifi);
+
+    //@formatter:off
+    @SuppressWarnings("deprecation")
+    Notification notification = new Notification.Builder(this)
+        .setSmallIcon(R.drawable.device_access_network_wifi)
+        .setLargeIcon(largeIcon)
+        .setContentTitle(getText(R.string.remote_service_label))
+        .setContentText(getText(R.string.remote_service_started))
+        .setWhen(System.currentTimeMillis())
+        .getNotification();
+    //@formatter:on
+
+    mNotificationManager.notify(R.string.remote_service_started, notification);
+  }
 
   private static final int RESPOND_TO_CLIENT = 0;
 
@@ -162,20 +188,4 @@ public class NetworkService extends Service implements ResponseCallback {
       }
     }
   };
-
-  /**
-   * Show a notification while this service is running.
-   */
-  private void showNotification() {
-    Bitmap largeIcon = BitmapFactory.decodeResource(getResources(), R.drawable.device_access_network_wifi);
-
-    @SuppressWarnings("deprecation")
-    Notification notification = new Notification.Builder(this).setSmallIcon(R.drawable.device_access_network_wifi)
-        .setLargeIcon(largeIcon).setContentTitle(getText(R.string.remote_service_label))
-        .setContentText(getText(R.string.remote_service_started)).setWhen(System.currentTimeMillis()).getNotification();
-
-    // Send the notification. We use a string id because it is a unique number.
-    // We use it later to cancel.
-    mNotificationManager.notify(R.string.remote_service_started, notification);
-  }
 }

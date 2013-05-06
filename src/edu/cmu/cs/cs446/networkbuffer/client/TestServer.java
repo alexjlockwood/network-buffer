@@ -13,27 +13,12 @@ import android.util.Log;
 
 public class TestServer extends Thread {
   private static final String TAG = TestServer.class.getSimpleName();
-  private static final int DEFAULT_POOL_SIZE = 16;
-  private static final int DEFAULT_PORT = 4444;
 
-  private final int mPort;
-  private final ExecutorService mPool;
+  private static final ExecutorService mPool = Executors.newFixedThreadPool(16);
+  private static final int mPort = 4444;
 
   private ServerSocket mServerSocket = null;
-  private boolean mRunning = false;
-
-  public TestServer() {
-    this(DEFAULT_PORT, DEFAULT_POOL_SIZE);
-  }
-
-  public TestServer(int port) {
-    this(port, DEFAULT_POOL_SIZE);
-  }
-
-  public TestServer(int port, int poolSize) {
-    this.mPort = port;
-    this.mPool = Executors.newFixedThreadPool(poolSize);
-  }
+  private boolean mRunning = true;
 
   @Override
   public void run() {
@@ -46,7 +31,6 @@ public class TestServer extends Thread {
 
     Log.i(TAG, "Test server waiting for incoming connections...");
 
-    mRunning = true;
     while (mRunning) {
       try {
         Socket clientSocket = mServerSocket.accept();
@@ -54,24 +38,15 @@ public class TestServer extends Thread {
         mPool.execute(new RequestHandler(clientSocket));
       } catch (IOException e) {
         Log.e(TAG, "Server received IOException while listening for clients...");
-        mRunning = false;
         break;
       }
     }
 
     Log.i(TAG, "Server closing...");
-
-    try {
-      if (mServerSocket != null) {
-        mServerSocket.close();
-        mServerSocket = null;
-      }
-    } catch (IOException e) {
-      Log.e(TAG, "Failed to close server socket.");
-    }
+    close();
   }
 
-  public synchronized void close() {
+  public void close() {
     mRunning = false;
     try {
       if (mServerSocket != null) {
@@ -96,13 +71,12 @@ public class TestServer extends Thread {
       BufferedReader bufferedReader = null;
       PrintWriter printWriter = null;
       try {
-        while (true) {
-          inputStreamReader = new InputStreamReader(socket.getInputStream());
-          bufferedReader = new BufferedReader(inputStreamReader);
-          String text = bufferedReader.readLine();
-          Log.i(TAG, "Received text: " + text);
-          printWriter = new PrintWriter(socket.getOutputStream(), true);
-          Log.i(TAG, "Writing text: " + text);
+        inputStreamReader = new InputStreamReader(socket.getInputStream());
+        bufferedReader = new BufferedReader(inputStreamReader);
+        printWriter = new PrintWriter(socket.getOutputStream(), true);
+
+        String text;
+        while ((text = bufferedReader.readLine()) != null) {
           printWriter.println(text);
         }
       } catch (IOException e) {
